@@ -1,0 +1,129 @@
+# 1. Estructura e historial
+
+$ ls -R .
+.:
+certs
+comprobaciones.txt
+nginx
+README.md
+web
+
+./certs:
+images.alumno.local.crt
+LEEME.md
+
+./nginx:
+images.alumno.local.conf
+
+./web:
+app.js
+estilos.css
+index.html
+
+$ git log --oneline
+0b6e578 La aplicación
+0b9caec Configuración
+a851b95 La aplicación
+1fa70c6 Generación de las imágenes
+6537a59 Instalación
+098575c Crear el proyecto
+
+$ git log --format='%an <%ae>' | sort -u
+Óscar Oramas <oscar.oramas@gmail.com>
+
+$ grep -RniE "BEGIN (RSA |EC |)PRIVATE KEY|password|passwd" . --exclude-dir=.git
+./README.md:108:docker exec dpl-lab bash -c 'echo "alumno:$(openssl passwd -apr1 CAMBIAR_ESTO)" > /etc/nginx/htpasswd-images'
+./README.md:190:docker exec dpl-lab ls -l /etc/nginx/htpasswd-images
+./README.md:191:docker exec dpl-lab cut -d: -f1 /etc/nginx/htpasswd-images
+./README.md:197:-rw-r----- 1 root www-data 45 Oct 19 15:20 /etc/nginx/htpasswd-images
+./nginx/images.alumno.local.conf:43:        auth_basic_user_file /etc/nginx/htpasswd-images;
+
+
+# 2. Configuración de nginx
+
+$ docker exec dpl-lab nginx -t
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+
+$ docker exec dpl-lab nginx -T | grep -E "server_name|image_filter|auth_basic|load_module"
+	# server_names_hash_bucket_size 64;
+	# server_name_in_redirect off;
+load_module modules/ngx_http_image_filter_module.so;
+    server_name www.alumno.local;
+    server_name app.alumno.local;
+    server_name images.alumno.local;
+        auth_basic "Galeria de imagenes";
+        auth_basic_user_file /etc/nginx/htpasswd-images;
+        # Sin esto, image_filter convierte la pagina de error del 401 en un
+        image_filter resize $img_size $img_size;
+        image_filter_sharpen $img_sharpen;
+        image_filter_jpeg_quality $img_quality;
+        image_filter_buffer 5M;
+    # Respuesta de autenticacion sin image_filter de por medio
+    server_name images.alumno.local;
+    server_name www.images.alumno.local;
+
+$ docker exec dpl-lab nginx -V 2>&1 | grep image_filter
+configure arguments: --with-cc-opt='-g -O2 -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -ffile-prefix-map=/build/nginx-PgwIQM/nginx-1.24.0=. -flto=auto -ffat-lto-objects -fstack-protector-strong -fstack-clash-protection -Wformat -Werror=format-security -fcf-protection -fdebug-prefix-map=/build/nginx-PgwIQM/nginx-1.24.0=/usr/src/nginx-1.24.0-2ubuntu7.18 -fPIC -Wdate-time -D_FORTIFY_SOURCE=3' --with-ld-opt='-Wl,-Bsymbolic-functions -flto=auto -ffat-lto-objects -Wl,-z,relro -Wl,-z,now -fPIC' --prefix=/usr/share/nginx --conf-path=/etc/nginx/nginx.conf --http-log-path=/var/log/nginx/access.log --error-log-path=stderr --lock-path=/var/lock/nginx.lock --pid-path=/run/nginx.pid --modules-path=/usr/lib/nginx/modules --http-client-body-temp-path=/var/lib/nginx/body --http-fastcgi-temp-path=/var/lib/nginx/fastcgi --http-proxy-temp-path=/var/lib/nginx/proxy --http-scgi-temp-path=/var/lib/nginx/scgi --http-uwsgi-temp-path=/var/lib/nginx/uwsgi --with-compat --with-debug --with-pcre-jit --with-http_ssl_module --with-http_stub_status_module --with-http_realip_module --with-http_auth_request_module --with-http_v2_module --with-http_dav_module --with-http_slice_module --with-threads --with-http_addition_module --with-http_flv_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_mp4_module --with-http_random_index_module --with-http_secure_link_module --with-http_sub_module --with-mail_ssl_module --with-stream_ssl_module --with-stream_ssl_preread_module --with-stream_realip_module --with-http_geoip_module=dynamic --with-http_image_filter_module=dynamic --with-http_perl_module=dynamic --with-http_xslt_module=dynamic --with-mail=dynamic --with-stream=dynamic --with-stream_geoip_module=dynamic
+
+
+# 3. Servicio y procesado
+
+$ docker exec dpl-lab curl -k -I https://localhost/ -H "Host: images.alumno.local"
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0  1350    0     0    0     0      0      0 --:--:--HTTP/1.1 200 OK
+Server: nginx/1.24.0 (Ubuntu)
+Date: Mon, 19 Oct 2026 20:39:57 GMT
+Content-Type: text/html
+Content-Length: 1350
+Last-Modified: Mon, 19 Oct 2026 17:01:01 GMT
+Connection: keep-alive
+ETag: "6ad64ccd-546"
+Accept-Ranges: bytes
+
+ --:--:-- --:--:--     0
+
+$ docker exec dpl-lab curl -k -I https://localhost/img/image01.jpg -H "Host: images.alumno.local"
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0   188    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+HTTP/1.1 401 Unauthorized
+Server: nginx/1.24.0 (Ubuntu)
+Date: Mon, 19 Oct 2026 20:39:57 GMT
+Content-Type: text/html
+Content-Length: 188
+Connection: keep-alive
+WWW-Authenticate: Basic realm="Galeria de imagenes"
+
+
+$ docker exec dpl-lab curl -k -u alumno:CAMBIAR_ESTO -o /tmp/ae3.jpg "https://localhost/img/image01.jpg?size=150&sharpen=30" -H "Host: images.alumno.local"
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  2451  100  2451    0     0   218k      0 --:--:-- --:--:-- --:--:--  239k
+
+$ docker exec dpl-lab identify /tmp/ae3.jpg
+/tmp/ae3.jpg JPEG 150x150 150x150+0+0 8-bit sRGB 2451B 0.000u 0:00.000
+
+$ curl -I -H "Host: www.images.alumno.local" http://localhost/
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0   178    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+HTTP/1.1 301 Moved Permanently
+Server: nginx/1.24.0 (Ubuntu)
+Date: Mon, 19 Oct 2026 20:39:57 GMT
+Content-Type: text/html
+Content-Length: 178
+Connection: keep-alive
+Location: https://images.alumno.local/
+
+
+
+# 4. Logs
+
+$ docker exec dpl-lab goaccess /var/log/nginx/images-alumno.access.log --log-format=COMBINED -o /tmp/ae3.json
+ [SETTING UP STORAGE /var/log/nginx/images-alumno.access.log] {0} @ {0/s}
+Cleaning up resources...
+
+$ docker exec dpl-lab head -c 400 /tmp/ae3.json
+{"general": {"start_date": "19/Oct/2026","end_date": "19/Oct/2026","date_time": "2026-10-19 21:40:53 +0100","total_requests": 23,"valid_requests": 23,"failed_requests": 0,"generation_time": 1,"unique_visitors": 1,"unique_files": 6,"excluded_hits": 0,"unique_referrers": 0,"unique_not_found": 0,"unique_static_files": 2,"log_size": 2251,"bandwidth": 44340,"log_path": ["\/var\/log\/nginx\/images-alumn
