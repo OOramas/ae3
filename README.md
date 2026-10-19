@@ -86,6 +86,49 @@ Obtuve la salida:
 
 Luego funcionó correctamente.
 
+## 3. Configuración
+
+Para configurar `images.alumno.local` seguí los pasos de la práctica guiada de `image_filter`.
+
+Primero generé un certificado autofirmado para `images.alumno.local` y `www.images.alumno.local`:
+
+```bash
+docker exec dpl-lab openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
+    -keyout /etc/ssl/dpl/images.alumno.local.key \
+    -out /etc/ssl/dpl/images.alumno.local.crt \
+    -subj "/CN=images.alumno.local" \
+    -addext "subjectAltName=DNS:images.alumno.local,DNS:www.images.alumno.local"
+```
+
+La clave privada se quedó en `/etc/ssl/dpl/` y solo guardé en el proyecto el certificado público y las instrucciones de generación.
+
+Después creé el usuario que protege las imágenes:
+
+```bash
+docker exec dpl-lab bash -c 'echo "alumno:$(openssl passwd -apr1 CAMBIAR_ESTO)" > /etc/nginx/htpasswd-images'
+```
+
+El fichero de usuarios se guarda fuera del DocumentRoot.
+
+Por último configuré el server block de `images.alumno.local`.
+
+En la configuración utilicé `map` para limitar los valores permitidos de tamaño, enfoque y calidad. También configuré:
+
+- HTTPS en el puerto 443.
+- `image_filter` dentro de `/img/`.
+- autenticación básica en `/img/`.
+- redirección de HTTP a HTTPS.
+- redirección de `www.images.alumno.local` a `images.alumno.local`.
+- logs propios para el sitio.
+
+Después activé el sitio y comprobé la configuración:
+
+```bash
+docker exec dpl-lab nginx -t
+```
+
+La comprobación terminó correctamente.
+
 ## 4. La aplicación
 
 Para crear la galería reutilicé el código del Paso 4 de la práctica guiada de `image_filter`.
