@@ -86,6 +86,25 @@ Obtuve la salida:
 
 Luego funcionó correctamente.
 
+## 4. La aplicación
+
+Para crear la galería reutilicé el código del Paso 4 de la práctica guiada de `image_filter`.
+
+Copié los archivos necesarios en la carpeta `web/`:
+
+```text
+index.html
+app.js
+estilos.css
+```
+
+Después los copié al directorio `/var/www/images.alumno.local/` para que nginx pudiera servir la aplicación.
+
+```bash
+docker exec dpl-lab bash -c 'cp /home/alumno/dpl/ae3/web/index.html /home/alumno/dpl/ae3/web/app.js /home/alumno/dpl/ae3/web/estilos.css /var/www/images.alumno.local/'
+docker exec dpl-lab chmod -R a+rX /var/www/images.alumno.local
+```
+
 ### Problema encontrado
 
 Al ejecutar `nginx -T` desde dentro del contenedor como usuario `alumno`, nginx no pudo leer la clave privada del certificado:
