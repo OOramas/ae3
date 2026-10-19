@@ -52,6 +52,40 @@ load_module modules/ngx_http_image_filter_module.so;
 
 Por tanto, comprobé que `image_filter` seguía instalado y activo.
 
+## 2. Generación de las imágenes
+
+Las 20 imágenes de prueba las generé dentro de `dpl-lab` con ImageMagick.
+
+Primero comprobé que ImageMagick seguía instalado y después creé la carpeta donde se guardan las imágenes:
+
+```bash
+docker exec dpl-lab apt-get install -y imagemagick
+docker exec dpl-lab mkdir -p /var/www/images.alumno.local/img
+```
+
+Las generé como se indica en la práctica de image_filter:
+
+```bash
+docker exec dpl-lab bash -c 'for i in $(seq -w 1 20); do \
+  convert -size 400x400 gradient:"#2f6fed"-"#8bc34a" \
+    -fill white -pointsize 64 -gravity center -annotate 0 "IMG $i" \
+    /var/www/images.alumno.local/img/image$i.jpg; done'
+```
+
+Y para comprobarlo:
+
+```bash
+docker exec dpl-lab identify /var/www/images.alumno.local/img/image01.jpg
+```
+
+Obtuve la salida:
+
+```text
+/var/www/images.alumno.local/img/image01.jpg JPEG 400x400 400x400+0+0 8-bit sRGB 12679B 0.000u 0:00.000
+```
+
+Luego funcionó correctamente.
+
 ### Problema encontrado
 
 Al ejecutar `nginx -T` desde dentro del contenedor como usuario `alumno`, nginx no pudo leer la clave privada del certificado:
